@@ -1,0 +1,267 @@
+<!doctype html>
+<html>
+  <head>
+    <title>MP Battleships</title>
+  </head>
+  <body>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <canvas id="gameboard" width="400" height="800">Requires HTML5 Canvas - Please upgrade your browser</canvas>
+          </td>
+          <td id="message-log" valign="top"></td>
+        </tr>
+        <tr>
+          <td>
+            <button id="ready">Ready</button>
+          </td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script>
+      var num_letter = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
+      var Battleships_Board = function() {
+        var _self = this;
+        _self.render_width = 400;
+        _self.render_height = 800;
+
+        _self.socket = null;
+        _self.canvas = null;
+        _self.context = null;
+        _self.blob = null;
+        _self.mouse_dragging = false;
+        _self.mouse_coords = {x:0, y:0};
+
+        _self.log = jQuery('#message-log');
+
+        _self.place_ships = [{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}];
+        _self.place_ship = -1;
+
+        _self.top_box = {
+          x: 7.5,
+          y: 7.5,
+          w: 385,
+          h: 385,
+        };
+        _self.bottom_box = {
+          x: 7.5,
+          y: 407.5,
+          w: 385,
+          h: 385,
+        };
+        _self.block_size = 35;
+
+        _self.point_in_box = function (box, point) {
+          return (
+            point.x > (box.x) &&
+            point.x < (box.x + box.w) &&
+            point.y > (box.y) &&
+            point.y < (box.y + box.h)
+          );
+        }
+        _self.xy_from_grid = function (box, point) {
+          for (var x=1; x<=10; x++) {
+            for (var y=1; y<=10; y++) {
+              if (_self.point_in_box({x:(box.x + (_self.block_size * x)), y:(box.y + (_self.block_size * y)), w:_self.block_size, h:_self.block_size},point)) {
+                return {x:x, y:y};
+              }
+            }
+          }
+          return null;
+        }
+        _self.ship_to_box = function (box, ship) {
+          return {
+            x: box.x + (_self.block_size * (ship.x + 1)),
+            y: box.y + (_self.block_size * (ship.y + 1)),
+            h: _self.block_size * (ship.d == 0 ? ship.s : 1),
+            w: _self.block_size * (ship.d == 1 ? ship.s : 1),
+          };
+        }
+
+
+        // GRAPHICS
+        _self.graphics = function() {
+          var render = function () {
+            _self.context.fillStyle = "#d5e6d3";
+            _self.context.fillRect(0,0,_self.render_width,_self.render_height);
+
+            var draw_cross_hair = function (box) {
+              _self.context.strokeStyle = "red";
+              _self.context.lineWidth = 2;
+              _self.context.lineCap = 'butt';
+
+              _self.context.beginPath();
+              _self.context.moveTo(_self.mouse_coords.x-10, _self.mouse_coords.y);
+              _self.context.lineTo(_self.mouse_coords.x+10, _self.mouse_coords.y);
+              _self.context.stroke();
+              _self.context.beginPath();
+              _self.context.moveTo(_self.mouse_coords.x, _self.mouse_coords.y-10);
+              _self.context.lineTo(_self.mouse_coords.x, _self.mouse_coords.y+10);
+              _self.context.stroke();
+            }
+
+            var draw_grid = function (box) {
+              _self.context.fillStyle = "#ffffff";
+              _self.context.fillRect(box.x+_self.block_size,box.y+_self.block_size,box.w-_self.block_size,box.h-_self.block_size);
+              _self.context.font = '20px Arial';
+              _self.context.textAlign = 'center';
+              _self.context.textBaseline = 'middle';
+              _self.context.fillStyle = 'blue';
+              _self.context.strokeStyle = "black";
+              _self.context.lineWidth = 2;
+              _self.context.lineCap = 'butt';
+              for (var i=0; i<=10; i++) {
+                _self.context.beginPath();
+                _self.context.moveTo(box.x + (_self.block_size * (i+1)), box.y + _self.block_size);
+                _self.context.lineTo(box.x + (_self.block_size * (i+1)), box.y + box.h);
+                _self.context.stroke();
+                _self.context.beginPath();
+                _self.context.moveTo(box.x + _self.block_size, box.y + (_self.block_size * (i+1)));
+                _self.context.lineTo(box.x + box.w, box.y + (_self.block_size * (i+1)));
+                _self.context.stroke();
+                if (i>0) {
+                  _self.context.fillText(i, box.x + (_self.block_size * i) + (_self.block_size / 2), box.y + (_self.block_size / 2));
+                  _self.context.fillText(num_letter[i-1], box.x + (_self.block_size / 2), box.y + (_self.block_size * i) + (_self.block_size / 2));
+                }
+              }
+            }
+
+
+            //if (_self.blob !== null) {
+              /*if (_self.blob.game_state == 0) {
+
+              } else if (_self.blob.game_state == 1) {
+                draw_grid(bottom_box);
+
+              } else if (_self.blob.game_state == 2) {
+                draw_grid(_self.top_box);*/
+                draw_grid(_self.bottom_box);
+
+                _self.context.strokeStyle = "blue";
+
+                for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
+                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i]);
+                  _self.context.beginPath();
+                  _self.context.rect(ship.x, ship.y, ship.w, ship.h);
+                  if (_self.place_ship == -1) {
+                    if (_self.point_in_box(ship, _self.mouse_coords)) {
+                      _self.context.fillStyle = 'lightblue';
+                    } else {
+                      _self.context.fillStyle = 'yellow';
+                    }
+                  } else {
+                    if (_self.place_ship == ship_i) {
+                      _self.context.fillStyle = 'blue';
+                    } else {
+                      _self.context.fillStyle = 'yellow';
+                    }
+                  }
+                  _self.context.fill();
+                  _self.context.stroke();
+                }
+
+                _self.context.fillStyle = "red";
+                var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+                if (block != null) {
+                  _self.context.fillRect(_self.bottom_box.x + (_self.block_size * block.x) + 4, _self.bottom_box.y + (_self.block_size * block.y) + 4, _self.block_size - 8, _self.block_size - 8);
+                }
+
+                draw_cross_hair();
+              /*
+              } else if (_self.blob.game_state == 3) {
+
+              }*/
+            //}
+          }
+          var tfunct = function() {
+            render();
+            setTimeout(tfunct, 100);
+          }
+          tfunct();
+        }
+
+        // INIT
+        _self.init = function(canvas_id) {
+          _self.canvas = document.getElementById(canvas_id);
+          _self.context = _self.canvas .getContext("2d");
+          _self.graphics();
+          _self.socket = io();
+          //_self.socket.on ....
+          //message-log
+          
+          _self.socket.on('client-id', function(id){
+            _self.log.prepend('<div>[] client-id: ' + id + '</div>');
+          });
+          _self.socket.on('player-joined', function(id){
+            _self.log.prepend('<div>[] player-joined: ' + id + '</div>');
+          });
+          _self.socket.on('player-left', function(id){
+            _self.log.prepend('<div>[] player-left: ' + id + '</div>');
+          });
+          _self.socket.on('game-data', function(blob){
+            log.prepend('<div>[] game-data: ' + blob.game_state + '/' + blob.turn + '</div>');
+            _self.blob = blob;
+          });
+
+          var jq_canvas = jQuery(_self.canvas);
+          jq_canvas.on('mousedown', function(event){
+            _self.mouse_dragging = true;
+            _self.drag(event, {x:event.offsetX, y:event.offsetY}, true);
+          });
+          jq_canvas.on('click', function(event){
+            _self.click(event, {x:event.offsetX, y:event.offsetY});
+          });
+          jq_canvas.on("mousemove", function(e){
+            _self.drag(event, {x:event.offsetX, y:event.offsetY}, false);
+          });
+          jQuery(document.body).mouseup(function() {
+            _self.mouse_dragging = false;
+            _self.place_ship = -1;
+          });
+
+        };
+
+
+        _self.drag = function(event, coords, first_click) {
+          event.preventDefault();
+          _self.mouse_coords = coords;
+          if (first_click == true) {
+
+            _self.place_ship = -1;
+
+            for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
+              var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i]);
+              
+              if (_self.point_in_box(ship, _self.mouse_coords)) {
+                _self.place_ship = ship_i;
+                break;
+              }
+              
+            }
+
+
+
+          } else {
+            if (_self.mouse_dragging) {
+              //_self.log.prepend('<div>[] dragging</div>');
+            }
+          }
+        }
+        _self.click = function(event, coords) {
+          event.preventDefault();
+          //_self.log.prepend('<div>[] click</div>');
+        }
+      };
+
+      // CREATE AND RUN
+      var gb = new Battleships_Board();
+      gb.init('gameboard');
+      
+
+    </script>
+  </body>
+</html>
