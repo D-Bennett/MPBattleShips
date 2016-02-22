@@ -40,6 +40,9 @@
 
         _self.place_ships = [{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}];
         _self.place_ship = -1;
+        _self.first_block = null;
+        _self.move_offset = null;
+        _self.move_valid_placement = false;
 
         _self.top_box = {
           x: 7.5,
@@ -64,24 +67,36 @@
           );
         }
         _self.xy_from_grid = function (box, point) {
-          for (var x=1; x<=10; x++) {
-            for (var y=1; y<=10; y++) {
-              if (_self.point_in_box({x:(box.x + (_self.block_size * x)), y:(box.y + (_self.block_size * y)), w:_self.block_size, h:_self.block_size},point)) {
+          for (var x=0; x<10; x++) {
+            for (var y=0; y<10; y++) {
+              var vbox = {
+                x:(box.x + (_self.block_size * (x+1))),
+                y:(box.y + (_self.block_size * (y+1))),
+                w:_self.block_size,
+                h:_self.block_size
+              };
+              if (_self.point_in_box(vbox,point)) {
                 return {x:x, y:y};
               }
             }
           }
           return null;
         }
-        _self.ship_to_box = function (box, ship) {
+        _self.ship_to_box = function (box, ship, offset) {
           return {
-            x: box.x + (_self.block_size * (ship.x + 1)),
-            y: box.y + (_self.block_size * (ship.y + 1)),
+            x: box.x + (_self.block_size * (ship.x + 1 + (offset==null?0:offset[0]))),
+            y: box.y + (_self.block_size * (ship.y + 1 + (offset==null?0:offset[1]))),
             h: _self.block_size * (ship.d == 0 ? ship.s : 1),
             w: _self.block_size * (ship.d == 1 ? ship.s : 1),
           };
         }
-
+        _self.ship_to_blocks = function (ship) {
+          var points = [];
+          for (var i=0; i<ship.s; i++) {
+            points.push([ship.x + (ship.d==1?i:0), ship.y + (ship.d==0?i:0)]);
+          }
+          return points;
+        }
 
         // GRAPHICS
         _self.graphics = function() {
@@ -144,30 +159,40 @@
                 _self.context.strokeStyle = "blue";
 
                 for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
-                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i]);
-                  _self.context.beginPath();
-                  _self.context.rect(ship.x, ship.y, ship.w, ship.h);
-                  if (_self.place_ship == -1) {
-                    if (_self.point_in_box(ship, _self.mouse_coords)) {
+                  if (ship_i != _self.place_ship) {
+                    var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i], null);
+                    _self.context.beginPath();
+                    _self.context.rect(ship.x, ship.y, ship.w, ship.h);
+                    if (_self.place_ship == -1 && _self.point_in_box(ship, _self.mouse_coords)) {
                       _self.context.fillStyle = 'lightblue';
                     } else {
                       _self.context.fillStyle = 'yellow';
                     }
+                    _self.context.fill();
+                    _self.context.stroke();
+                  }
+                }
+
+                if (_self.place_ship > -1) {
+                  var os = _self.move_offset;
+                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[_self.place_ship], os);
+                  _self.context.beginPath();
+                  _self.context.rect(ship.x, ship.y, ship.w, ship.h);
+                  if (_self.move_valid_placement) {
+                    _self.context.fillStyle = 'blue';
                   } else {
-                    if (_self.place_ship == ship_i) {
-                      _self.context.fillStyle = 'blue';
-                    } else {
-                      _self.context.fillStyle = 'yellow';
-                    }
+                    _self.context.fillStyle = 'red';
                   }
                   _self.context.fill();
                   _self.context.stroke();
                 }
 
+
+
                 _self.context.fillStyle = "red";
                 var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
                 if (block != null) {
-                  _self.context.fillRect(_self.bottom_box.x + (_self.block_size * block.x) + 4, _self.bottom_box.y + (_self.block_size * block.y) + 4, _self.block_size - 8, _self.block_size - 8);
+                  _self.context.fillRect(_self.bottom_box.x + (_self.block_size * (block.x+1)) + 4, _self.bottom_box.y + (_self.block_size * (block.y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
                 }
 
                 draw_cross_hair();
@@ -203,7 +228,7 @@
             _self.log.prepend('<div>[] player-left: ' + id + '</div>');
           });
           _self.socket.on('game-data', function(blob){
-            log.prepend('<div>[] game-data: ' + blob.game_state + '/' + blob.turn + '</div>');
+            _self.log.prepend('<div>[] game-data: ' + blob.game_state + '/' + blob.turn + '</div>');
             _self.blob = blob;
           });
 
@@ -230,24 +255,38 @@
           event.preventDefault();
           _self.mouse_coords = coords;
           if (first_click == true) {
-
             _self.place_ship = -1;
-
-            for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
-              var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i]);
-              
-              if (_self.point_in_box(ship, _self.mouse_coords)) {
-                _self.place_ship = ship_i;
-                break;
+            _self.first_block = null;
+            var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+            if (block != null) {
+              for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
+                var points = _self.ship_to_blocks(_self.place_ships[ship_i]);
+                for (var point_i=0; point_i<points.length; point_i++) {
+                  if (points[point_i][0] == block.x && points[point_i][1] == block.y) {
+                    _self.place_ship = ship_i;
+                    _self.first_block = block;
+                    _self.move_offset = [0,0];
+                    _self.move_valid_placement = true;
+                    break;
+                  }
+                }
               }
-              
             }
-
-
-
           } else {
             if (_self.mouse_dragging) {
-              //_self.log.prepend('<div>[] dragging</div>');
+              if (_self.place_ship > -1 && _self.first_block != null) {
+                var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+                if (block != null) {
+                  var offset = [
+                    block.x - _self.first_block.x,
+                    block.y - _self.first_block.y,
+                  ];
+                  var valid_placement = false;
+
+                  _self.move_offset = offset;
+                  _self.move_valid_placement = valid_placement;
+                }
+              }
             }
           }
         }
