@@ -42,6 +42,7 @@
         _self.place_ship = -1;
         _self.first_block = null;
         _self.move_offset = null;
+        _self.move_rot = 0;
         _self.move_valid_placement = false;
 
         _self.top_box = {
@@ -82,18 +83,37 @@
           }
           return null;
         }
-        _self.ship_to_box = function (box, ship, offset) {
+        _self.ship_to_box = function (box, ship, offset, offset_rotation) {
           return {
             x: box.x + (_self.block_size * (ship.x + 1 + (offset==null?0:offset[0]))),
             y: box.y + (_self.block_size * (ship.y + 1 + (offset==null?0:offset[1]))),
-            h: _self.block_size * (ship.d == 0 ? ship.s : 1),
-            w: _self.block_size * (ship.d == 1 ? ship.s : 1),
+            h: _self.block_size * ((offset_rotation==null?ship.d:offset_rotation) == 0 ? ship.s : 1),
+            w: _self.block_size * ((offset_rotation==null?ship.d:offset_rotation) == 1 ? ship.s : 1),
           };
         }
-        _self.ship_to_blocks = function (ship) {
+        _self.valid_ship_placement = function (ship, offset, offset_rotation) {
+          var ship_points = _self.ship_to_blocks(_self.place_ships[ship], offset, offset_rotation);
+          for (var p=0; p<ship_points.length; p++) {
+            if (ship_points[p][0]<0||ship_points[p][1]<0||ship_points[p][0]>9||ship_points[p][1]>9) {
+              return false;
+            }
+            for (var q=0; q<_self.place_ships.length; q++) {
+              if (q != ship) {
+                var other_ship_points = _self.ship_to_blocks(_self.place_ships[q]);
+                for (var r=0; r<other_ship_points.length; r++) {
+                  if (other_ship_points[r][0] == ship_points[p][0] && other_ship_points[r][1] == ship_points[p][1]) {
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+          return true;
+        }
+        _self.ship_to_blocks = function (ship, offset, offset_rotation) {
           var points = [];
           for (var i=0; i<ship.s; i++) {
-            points.push([ship.x + (ship.d==1?i:0), ship.y + (ship.d==0?i:0)]);
+            points.push([ship.x + (offset==null?0:offset[0]) + ((offset_rotation==null?ship.d:offset_rotation)==1?i:0), ship.y + (offset==null?0:offset[1]) + ((offset_rotation==null?ship.d:offset_rotation)==0?i:0)]);
           }
           return points;
         }
@@ -160,7 +180,7 @@
 
                 for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
                   if (ship_i != _self.place_ship) {
-                    var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i], null);
+                    var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i], null, null);
                     _self.context.beginPath();
                     _self.context.rect(ship.x, ship.y, ship.w, ship.h);
                     if (_self.place_ship == -1 && _self.point_in_box(ship, _self.mouse_coords)) {
@@ -175,7 +195,7 @@
 
                 if (_self.place_ship > -1) {
                   var os = _self.move_offset;
-                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[_self.place_ship], os);
+                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[_self.place_ship], os, _self.move_rot);
                   _self.context.beginPath();
                   _self.context.rect(ship.x, ship.y, ship.w, ship.h);
                   if (_self.move_valid_placement) {
@@ -244,12 +264,12 @@
             _self.drag(event, {x:event.offsetX, y:event.offsetY}, false);
           });
           jQuery(document.body).mouseup(function() {
-            _self.mouse_dragging = false;
-            _self.place_ship = -1;
+            _self.dragEnd(event, {x:event.offsetX, y:event.offsetY});
           });
-
+          jQuery(document.body).keypress(function( event ) {
+            _self.keypress(event); 
+          });
         };
-
 
         _self.drag = function(event, coords, first_click) {
           event.preventDefault();
@@ -260,11 +280,12 @@
             var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
             if (block != null) {
               for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
-                var points = _self.ship_to_blocks(_self.place_ships[ship_i]);
+                var points = _self.ship_to_blocks(_self.place_ships[ship_i], null, null);
                 for (var point_i=0; point_i<points.length; point_i++) {
                   if (points[point_i][0] == block.x && points[point_i][1] == block.y) {
                     _self.place_ship = ship_i;
-                    _self.first_block = block;
+                    _self.first_block = {x:_self.place_ships[ship_i].x, y:_self.place_ships[ship_i].y}; //block;
+                    _self.move_rot = _self.place_ships[ship_i].d;
                     _self.move_offset = [0,0];
                     _self.move_valid_placement = true;
                     break;
@@ -281,12 +302,40 @@
                     block.x - _self.first_block.x,
                     block.y - _self.first_block.y,
                   ];
-                  var valid_placement = false;
+                  var valid_placement = _self.valid_ship_placement(_self.place_ship, offset, _self.move_rot);
 
                   _self.move_offset = offset;
                   _self.move_valid_placement = valid_placement;
                 }
               }
+            }
+          }
+        }
+
+        _self.dragEnd = function(event, coords) {
+          event.preventDefault();
+          _self.mouse_dragging = false;
+          //PLACE STUFF
+          
+          _self.place_ship = -1;
+          _self.first_block = null
+          _self.move_rot = 0;
+          _self.move_offset = null;
+          _self.move_valid_placement = false;          
+        }
+
+        _self.keypress = function(event) {
+          console.log(event);
+          if (event.keyCode == 114 || event.keyCode == 82) {
+            if (_self.mouse_dragging) {
+              //alert("!");
+              if (_self.move_rot==0) {
+                _self.move_rot = 1;
+              } else {
+                _self.move_rot = 0;
+              }
+              var valid_placement = _self.valid_ship_placement(_self.place_ship, _self.move_offset, _self.move_rot);
+              _self.move_valid_placement = valid_placement;
             }
           }
         }
