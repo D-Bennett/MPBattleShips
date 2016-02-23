@@ -316,7 +316,12 @@
           event.preventDefault();
           _self.mouse_dragging = false;
           //PLACE STUFF
-          
+          var valid_placement = _self.valid_ship_placement(_self.place_ship, _self.move_offset, _self.move_rot);
+          if (valid_placement) {
+            _self.place_ships[_self.place_ship].x += _self.move_offset[0];
+            _self.place_ships[_self.place_ship].y += _self.move_offset[1];
+            _self.place_ships[_self.place_ship].d = _self.move_rot;
+          }
           _self.place_ship = -1;
           _self.first_block = null
           _self.move_rot = 0;
