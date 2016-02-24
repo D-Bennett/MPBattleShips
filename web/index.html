@@ -34,8 +34,6 @@
         _self.mouse_dragging = false;
         _self.mouse_coords = {x:0, y:0};
 
-        _self.ready_up = false;
-
         _self.log = jQuery('#message-log');
 
         _self.place_ship = -1;
@@ -274,7 +272,7 @@
         _self.drag = function(event, coords, first_click) {
           event.preventDefault();
           _self.mouse_coords = coords;
-          if (_self.blob.game_state == 1 && _self.ready_up == false) {
+          if (_self.blob.game_state == 1 && _self.blob.data.ready_up == false) {
             if (first_click == true) {
               _self.place_ship = -1;
               _self.first_block = null;
@@ -317,7 +315,7 @@
         _self.dragEnd = function(event, coords) {
           event.preventDefault();
           _self.mouse_dragging = false;
-          if (_self.blob.game_state == 1 && _self.ready_up == false) {
+          if (_self.blob.game_state == 1 && _self.blob.data.ready_up == false) {
             var valid_placement = _self.valid_ship_placement(_self.place_ship, _self.move_offset, _self.move_rot);
             if (valid_placement) {
               _self.socket.emit('place-ship', {
@@ -358,8 +356,7 @@
         }
 
         _self.readyClick = function(event) {
-          if (_self.blob.game_state == 1 && _self.ready_up == false) {
-            _self.ready_up = true;
+          if (_self.blob.game_state == 1 && _self.blob.data.ready_up == false) {
             _self.socket.emit('ready');
           }
         }

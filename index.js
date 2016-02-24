@@ -6,8 +6,8 @@ var MPMono_Server = function() {
 	_self.game_state = 0; //0=Waiting, 1=Setup, 2=Runing, 3=Gameover
 	_self.players = [null,null];
 	_self.players_data = [
-		{grid:null,attacks:null,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]},
-		{grid:null,attacks:null,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]}
+		{grid:null,attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]},
+		{grid:null,attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]}
 	];
 	_self.players_placed = [0,0];
 	_self.players_ready = [0,0];
@@ -47,16 +47,11 @@ var MPMono_Server = function() {
 		//Send chat message to all.
 	}
 	_self.player_ready = function (player_slot) {
-		if (_self.game_state == 1) {
-			if (player_slot >= 0) {
-				if (_self.players_placed[player_slot] == 1) {
-					_self.players_ready[player_slot] = 1;
-					if (_self.players_ready[0] == 1 && _self.players_ready[1] == 1) {
-						_self.set_game_state(2);
-					} else {
-						_self.send_game_data();
-					}
-				}
+		if (_self.game_state == 1 && player_slot >= 0) {
+			_self.players_data[player_slot].ready_up = true;
+			_self.send_player_game_data(player_slot);
+			if (_self.players_data[0].ready_up && _self.players_data[1].ready_up) {
+				_self.set_game_state(2);
 			}
 		}
 	}
@@ -70,11 +65,14 @@ var MPMono_Server = function() {
 		} else if (ns == 2) {
 			_self.game_state = 2;
 
+		} else if (ns == 3) {
+			_self.game_state = 2;
+
 		}
 		_self.send_game_data();
 	}
 	_self.game_end = function () {
-		_self.game_state = 3;
+		_self.set_game_state(3);
 		//GAME OVER
 	}
 	_self.send_game_data = function() {
@@ -138,21 +136,17 @@ var MPMono_Server = function() {
 				}
 			}
 			socket.on('place-ship', function(data){
-				console.log("place-ship", data);
-
 				var ship = data.index;
 				if (_self.valid_ship_placement(ship, _self.players_data[slot].ships, data.data)) {
-					console.log("A",_self.players_data[slot].ships[ship])
 					_self.players_data[slot].ships[ship].x = data.data.x;
 					_self.players_data[slot].ships[ship].y = data.data.y;
 					_self.players_data[slot].ships[ship].d = data.data.d;
-					console.log("B",_self.players_data[slot].ships[ship]);
 					_self.send_player_game_data(slot);
 				}
 
 			});
 			socket.on('ready', function(){
-				console.log("READY");
+				_self.player_ready(slot);
 			});
 			socket.on('disconnect', function(){
 				_self.player_disconnect(slot);
