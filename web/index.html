@@ -13,9 +13,7 @@
           <td id="message-log" valign="top"></td>
         </tr>
         <tr>
-          <td>
-            <button id="ready">Ready</button>
-          </td>
+          <td><button id="ready">Ready</button></td>
           <td></td>
         </tr>
       </tbody>
@@ -36,9 +34,10 @@
         _self.mouse_dragging = false;
         _self.mouse_coords = {x:0, y:0};
 
+        _self.ready_up = false;
+
         _self.log = jQuery('#message-log');
 
-        _self.place_ships = [{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}];
         _self.place_ship = -1;
         _self.first_block = null;
         _self.move_offset = null;
@@ -59,7 +58,7 @@
         };
         _self.block_size = 35;
 
-        _self.point_in_box = function (box, point) {
+        _self.point_in_box = function (box, point){
           return (
             point.x > (box.x) &&
             point.x < (box.x + box.w) &&
@@ -92,14 +91,14 @@
           };
         }
         _self.valid_ship_placement = function (ship, offset, offset_rotation) {
-          var ship_points = _self.ship_to_blocks(_self.place_ships[ship], offset, offset_rotation);
+          var ship_points = _self.ship_to_blocks(_self.blob.data.ships[ship], offset, offset_rotation);
           for (var p=0; p<ship_points.length; p++) {
             if (ship_points[p][0]<0||ship_points[p][1]<0||ship_points[p][0]>9||ship_points[p][1]>9) {
               return false;
             }
-            for (var q=0; q<_self.place_ships.length; q++) {
+            for (var q=0; q<_self.blob.data.ships.length; q++) {
               if (q != ship) {
-                var other_ship_points = _self.ship_to_blocks(_self.place_ships[q]);
+                var other_ship_points = _self.ship_to_blocks(_self.blob.data.ships[q]);
                 for (var r=0; r<other_ship_points.length; r++) {
                   if (other_ship_points[r][0] == ship_points[p][0] && other_ship_points[r][1] == ship_points[p][1]) {
                     return false;
@@ -166,61 +165,58 @@
             }
 
 
-            //if (_self.blob !== null) {
-              /*if (_self.blob.game_state == 0) {
+            if (_self.blob !== null) {
+              if (_self.blob.game_state == 0) {
 
               } else if (_self.blob.game_state == 1) {
-                draw_grid(bottom_box);
+              draw_grid(_self.bottom_box);
 
-              } else if (_self.blob.game_state == 2) {
-                draw_grid(_self.top_box);*/
-                draw_grid(_self.bottom_box);
+              _self.context.strokeStyle = "blue";
 
-                _self.context.strokeStyle = "blue";
-
-                for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
-                  if (ship_i != _self.place_ship) {
-                    var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[ship_i], null, null);
-                    _self.context.beginPath();
-                    _self.context.rect(ship.x, ship.y, ship.w, ship.h);
-                    if (_self.place_ship == -1 && _self.point_in_box(ship, _self.mouse_coords)) {
-                      _self.context.fillStyle = 'lightblue';
-                    } else {
-                      _self.context.fillStyle = 'yellow';
-                    }
-                    _self.context.fill();
-                    _self.context.stroke();
-                  }
-                }
-
-                if (_self.place_ship > -1) {
-                  var os = _self.move_offset;
-                  var ship = _self.ship_to_box(_self.bottom_box, _self.place_ships[_self.place_ship], os, _self.move_rot);
+              for (var ship_i=0; ship_i<_self.blob.data.ships.length; ship_i++) {
+                if (ship_i != _self.place_ship) {
+                  var ship = _self.ship_to_box(_self.bottom_box, _self.blob.data.ships[ship_i], null, null);
                   _self.context.beginPath();
                   _self.context.rect(ship.x, ship.y, ship.w, ship.h);
-                  if (_self.move_valid_placement) {
-                    _self.context.fillStyle = 'blue';
+                  if (_self.place_ship == -1 && _self.point_in_box(ship, _self.mouse_coords)) {
+                    _self.context.fillStyle = 'lightblue';
                   } else {
-                    _self.context.fillStyle = 'red';
+                    _self.context.fillStyle = 'yellow';
                   }
                   _self.context.fill();
                   _self.context.stroke();
                 }
+              }
 
-
-
-                _self.context.fillStyle = "red";
-                var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
-                if (block != null) {
-                  _self.context.fillRect(_self.bottom_box.x + (_self.block_size * (block.x+1)) + 4, _self.bottom_box.y + (_self.block_size * (block.y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
+              if (_self.place_ship > -1) {
+                var os = _self.move_offset;
+                var ship = _self.ship_to_box(_self.bottom_box, _self.blob.data.ships[_self.place_ship], os, _self.move_rot);
+                _self.context.beginPath();
+                _self.context.rect(ship.x, ship.y, ship.w, ship.h);
+                if (_self.move_valid_placement) {
+                  _self.context.fillStyle = 'blue';
+                } else {
+                  _self.context.fillStyle = 'red';
                 }
+                _self.context.fill();
+                _self.context.stroke();
+              }
 
-                draw_cross_hair();
-              /*
+              _self.context.fillStyle = "red";
+              var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+              if (block != null) {
+                _self.context.fillRect(_self.bottom_box.x + (_self.block_size * (block.x+1)) + 4, _self.bottom_box.y + (_self.block_size * (block.y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
+              }
+
+              draw_cross_hair();
+
+              } else if (_self.blob.game_state == 2) {
+                draw_grid(_self.top_box);
+                draw_grid(_self.bottom_box);
               } else if (_self.blob.game_state == 3) {
 
-              }*/
-            //}
+              }
+            }
           }
           var tfunct = function() {
             render();
@@ -237,7 +233,7 @@
           _self.socket = io();
           //_self.socket.on ....
           //message-log
-          
+
           _self.socket.on('client-id', function(id){
             _self.log.prepend('<div>[] client-id: ' + id + '</div>');
           });
@@ -250,6 +246,7 @@
           _self.socket.on('game-data', function(blob){
             _self.log.prepend('<div>[] game-data: ' + blob.game_state + '/' + blob.turn + '</div>');
             _self.blob = blob;
+            console.log(_self.blob);
           });
 
           var jq_canvas = jQuery(_self.canvas);
@@ -269,43 +266,48 @@
           jQuery(document.body).keypress(function( event ) {
             _self.keypress(event); 
           });
+          jQuery('#ready').on('click', function(event){
+            _self.readyClick(event);
+          });
         };
 
         _self.drag = function(event, coords, first_click) {
           event.preventDefault();
           _self.mouse_coords = coords;
-          if (first_click == true) {
-            _self.place_ship = -1;
-            _self.first_block = null;
-            var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
-            if (block != null) {
-              for (var ship_i=0; ship_i<_self.place_ships.length; ship_i++) {
-                var points = _self.ship_to_blocks(_self.place_ships[ship_i], null, null);
-                for (var point_i=0; point_i<points.length; point_i++) {
-                  if (points[point_i][0] == block.x && points[point_i][1] == block.y) {
-                    _self.place_ship = ship_i;
-                    _self.first_block = {x:_self.place_ships[ship_i].x, y:_self.place_ships[ship_i].y}; //block;
-                    _self.move_rot = _self.place_ships[ship_i].d;
-                    _self.move_offset = [0,0];
-                    _self.move_valid_placement = true;
-                    break;
+          if (_self.blob.game_state == 1 && _self.ready_up == false) {
+            if (first_click == true) {
+              _self.place_ship = -1;
+              _self.first_block = null;
+              var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+              if (block != null) {
+                for (var ship_i=0; ship_i<_self.blob.data.ships.length; ship_i++) {
+                  var points = _self.ship_to_blocks(_self.blob.data.ships[ship_i], null, null);
+                  for (var point_i=0; point_i<points.length; point_i++) {
+                    if (points[point_i][0] == block.x && points[point_i][1] == block.y) {
+                      _self.place_ship = ship_i;
+                      _self.first_block = {x:_self.blob.data.ships[ship_i].x, y:_self.blob.data.ships[ship_i].y}; //block;
+                      _self.move_rot = _self.blob.data.ships[ship_i].d;
+                      _self.move_offset = [0,0];
+                      _self.move_valid_placement = true;
+                      break;
+                    }
                   }
                 }
               }
-            }
-          } else {
-            if (_self.mouse_dragging) {
-              if (_self.place_ship > -1 && _self.first_block != null) {
-                var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
-                if (block != null) {
-                  var offset = [
-                    block.x - _self.first_block.x,
-                    block.y - _self.first_block.y,
-                  ];
-                  var valid_placement = _self.valid_ship_placement(_self.place_ship, offset, _self.move_rot);
+            } else {
+              if (_self.mouse_dragging) {
+                if (_self.place_ship > -1 && _self.first_block != null) {
+                  var block = _self.xy_from_grid(_self.bottom_box, _self.mouse_coords);
+                  if (block != null) {
+                    var offset = [
+                      block.x - _self.first_block.x,
+                      block.y - _self.first_block.y,
+                    ];
+                    var valid_placement = _self.valid_ship_placement(_self.place_ship, offset, _self.move_rot);
 
-                  _self.move_offset = offset;
-                  _self.move_valid_placement = valid_placement;
+                    _self.move_offset = offset;
+                    _self.move_valid_placement = valid_placement;
+                  }
                 }
               }
             }
@@ -315,25 +317,31 @@
         _self.dragEnd = function(event, coords) {
           event.preventDefault();
           _self.mouse_dragging = false;
-          //PLACE STUFF
-          var valid_placement = _self.valid_ship_placement(_self.place_ship, _self.move_offset, _self.move_rot);
-          if (valid_placement) {
-            _self.place_ships[_self.place_ship].x += _self.move_offset[0];
-            _self.place_ships[_self.place_ship].y += _self.move_offset[1];
-            _self.place_ships[_self.place_ship].d = _self.move_rot;
+          if (_self.blob.game_state == 1 && _self.ready_up == false) {
+            var valid_placement = _self.valid_ship_placement(_self.place_ship, _self.move_offset, _self.move_rot);
+            if (valid_placement) {
+              _self.socket.emit('place-ship', {
+                index: _self.place_ship,
+                data: {
+                  x: _self.blob.data.ships[_self.place_ship].x + _self.move_offset[0],
+                  y: _self.blob.data.ships[_self.place_ship].y + _self.move_offset[1],
+                  d: _self.move_rot
+                }
+              });
+            }
           }
           _self.place_ship = -1;
           _self.first_block = null
           _self.move_rot = 0;
           _self.move_offset = null;
-          _self.move_valid_placement = false;          
+          _self.move_valid_placement = false;  
+
         }
 
         _self.keypress = function(event) {
           console.log(event);
           if (event.keyCode == 114 || event.keyCode == 82) {
             if (_self.mouse_dragging) {
-              //alert("!");
               if (_self.move_rot==0) {
                 _self.move_rot = 1;
               } else {
@@ -344,16 +352,22 @@
             }
           }
         }
+
         _self.click = function(event, coords) {
           event.preventDefault();
-          //_self.log.prepend('<div>[] click</div>');
+        }
+
+        _self.readyClick = function(event) {
+          if (_self.blob.game_state == 1 && _self.ready_up == false) {
+            _self.ready_up = true;
+            _self.socket.emit('ready');
+          }
         }
       };
 
       // CREATE AND RUN
       var gb = new Battleships_Board();
       gb.init('gameboard');
-      
 
     </script>
   </body>
