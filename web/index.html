@@ -137,6 +137,41 @@
               _self.context.stroke();
             }
 
+            // _self.context.fillRect(_self.top_box.x + (_self.block_size * (x+1)) + 4, _self.top_box.y + (_self.block_size * (y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
+
+            var draw_hit = function (box, x, y) {
+              var lx = box.x + (_self.block_size * (x+1));
+              var ly = box.y + (_self.block_size * (y+1));
+
+              _self.context.strokeStyle = "red";
+              _self.context.lineWidth = 3;
+              _self.context.lineCap = 'round';
+
+              _self.context.beginPath();
+              _self.context.moveTo(lx + 2, ly + 2);
+              _self.context.lineTo(lx + _self.block_size - 4, ly + _self.block_size - 4);
+              _self.context.stroke();
+
+              _self.context.beginPath();
+              _self.context.moveTo(lx + 2, ly + _self.block_size - 4);
+              _self.context.lineTo(lx + _self.block_size - 4, ly + 2);
+              _self.context.stroke();
+
+            }
+
+            var draw_miss = function (box, x, y) {
+
+              var cx = box.x + (_self.block_size * (x+1)) + (_self.block_size*0.5);
+              var cy = box.y + (_self.block_size * (y+1)) + (_self.block_size*0.5);
+
+              _self.context.strokeStyle = "blue";
+              _self.context.lineWidth = 3;
+
+              _self.context.beginPath();
+              _self.context.arc(cx, cy, (_self.block_size*0.5)-2, 0, 2 * Math.PI, false);
+              _self.context.stroke();
+            }
+
             var draw_grid = function (box) {
               _self.context.fillStyle = "#ffffff";
               _self.context.fillRect(box.x+_self.block_size,box.y+_self.block_size,box.w-_self.block_size,box.h-_self.block_size);
@@ -221,19 +256,22 @@
                     _self.context.fill();
                     _self.context.stroke();
                 }
-                _self.context.fillStyle = 'red';
+                
                 for (var x=0; x<10; x++) {
                   for (var y=0; y<10; y++) {
-                    if (_self.blob.opponents_atack[x][y] == 1) {
-                      _self.context.fillRect(_self.bottom_box.x + (_self.block_size * (x+1)) + 4, _self.bottom_box.y + (_self.block_size * (y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
+                    if (_self.blob.opponents_atack[x][y] == 1) { //Enemy attack (MISSED)
+                      draw_miss(_self.bottom_box, x, y);
+                    } else if (_self.blob.opponents_atack[x][y] == 2) { //Enemy attack (HIT)
+                      draw_hit(_self.bottom_box, x, y);
                     }
                   }
                 }
                 for (var x=0; x<10; x++) {
                   for (var y=0; y<10; y++) {
-                    if (_self.blob.data.attacks[x][y] == 1 || _self.blob.data.attacks[x][y] == 2) {
-                      _self.context.fillStyle = _self.blob.data.attacks[x][y] == 1 ? 'red' : 'blue';
-                      _self.context.fillRect(_self.top_box.x + (_self.block_size * (x+1)) + 4, _self.top_box.y + (_self.block_size * (y+1)) + 4, _self.block_size - 8, _self.block_size - 8);
+                    if (_self.blob.data.attacks[x][y] == 1) { //Your attack (MISSED)
+                      draw_miss(_self.top_box, x, y);
+                    } else if (_self.blob.data.attacks[x][y] == 2) { //Enemy attack (HIT)
+                      draw_hit(_self.top_box, x, y);
                     }
                   }
                 }

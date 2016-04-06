@@ -6,8 +6,8 @@ var MPMono_Server = function() {
 	_self.game_state = 0; //0=Waiting, 1=Setup, 2=Runing, 3=Gameover
 	_self.players = [null,null];
 	_self.players_data = [
-		{attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]},
-		{attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1},{x:0,y:1,d:1,s:2},{x:0,y:2,d:1,s:3},{x:0,y:3,d:1,s:4},{x:0,y:4,d:1,s:5}]}
+		{attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1,h:0},{x:0,y:1,d:1,s:2,h:0},{x:0,y:2,d:1,s:3,h:0},{x:0,y:3,d:1,s:4,h:0},{x:0,y:4,d:1,s:5,h:0}]},
+		{attacks:null,ready_up:false,ships:[{x:0,y:0,d:1,s:1,h:0},{x:0,y:1,d:1,s:2,h:0},{x:0,y:2,d:1,s:3,h:0},{x:0,y:3,d:1,s:4,h:0},{x:0,y:4,d:1,s:5,h:0}]}
 	];
 	_self.players_placed = [0,0];
 	_self.players_ready = [0,0];
@@ -147,10 +147,20 @@ var MPMono_Server = function() {
 			socket.on('attack', function(data){
 				if (data !== null) {
 					if (data.x >= 0 && data.x < 10 && data.y >=0 && data.y < 10) {
-						if (_self.turn == slot) {
-							_self.turn = (slot==0?1:0);
+						if (_self.turn == slot && _self.players_data[slot].attacks[data.x][data.y] == 0) {
+							var otherplayer = (slot==0?1:0);
+							_self.turn = otherplayer;
 							_self.players_data[slot].attacks[data.x][data.y] = 1;
-							//if hit ship make 2
+							for (var q=0; q<_self.players_data[otherplayer].ships.length; q++) {
+								var other_ship_points = _self.ship_to_blocks(_self.players_data[otherplayer].ships[q]);
+								for (var qi=0; qi<other_ship_points.length; qi++) {
+									if (other_ship_points[qi][0] == data.x && other_ship_points[qi][1] == data.y) {
+										_self.players_data[slot].attacks[data.x][data.y] = 2;
+										_self.players_data[otherplayer].ships[q].h++;
+										break;
+									}
+								}
+							}
 							_self.send_game_data();
 						}
 					}
