@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MP Battleships</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12">
+          <h3>Multiplayer Battleships's</h3>
+        </div>
+      </div>
+      <div id="lobby_frame" style="display: none">
+        <div class="row">
+          <div class="col-xs-4">
+            <h3>Find or create a game</h3>
+            <button id="lobby_find_game_button" type="button" class="btn btn-success">Find a game</button>
+          </div>
+          <div class="col-xs-4">
+            <h3>Players</h3>
+            <div id="lobby_player_list"></div>
+          </div>
+          <div class="col-xs-4">
+            <h3>Games</h3>
+            <div id="lobby_game_list"></div>
+          </div>
+        </div>
+      </div>
+      <div id="game_frame" style="display: none">
+        <div class="row">
+          <div class="col-xs-8">
+            <canvas id="game_board" width="800" height="500">Requires HTML5 Canvas - Please upgrade your browser</canvas>
+          </div>
+          <div class="col-xs-4">
+            <button id="game_ready_button" type="button" class="btn btn-success" style="display: none">Ready</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="popup" class="modal fade" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content" style="padding: 40px 15px;">
+          <div id="popup_content" class="modal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+    <script src="/assets/js/game_viewer.js"></script>
+    <script type="text/javascript">
+
+      //Socket.IO
+      var socket = io();
+
+      //Lobby DOM
+      var lobby_frame = jQuery("#lobby_frame");
+      var lobby_find_game_button = jQuery("#lobby_find_game_button");
+      var lobby_player_list = jQuery("#lobby_player_list");
+      var lobby_game_list = jQuery("#lobby_game_list");
+
+      //Game DOM
+      var game_frame = jQuery("#game_frame");
+      var game_board = jQuery("#game_board");
+      var game_ready_button = jQuery("#game_ready_button");
+
+      //Popup DOM
+      var popup = jQuery("#popup");
+      var popup_content = jQuery("#popup_content");
+
+      //
+      var game_id = null;
+      var user_id = null;
+      var game_viewer = new Game_Viewer("game_board", "game_ready_button");
+      game_viewer.setupEvents();
+
+      var showLobby = function() {
+        game_frame.hide();
+        game_viewer.stopRendering();
+        lobby_frame.show();
+      }
+
+      var showGame = function() {
+        lobby_frame.hide();
+        game_viewer.resetGui();
+        game_viewer.startRendering();
+        game_frame.show();
+      };
+
+      socket.on("lobby-info", function(data) {
+        if (game_id == null) {
+          var lobby_player_list_html = "<ul>";
+          for (var i=0; i<data.clients.length; i++) {
+            lobby_player_list_html += "<li>" + data.clients[i] + "</li>";
+          }
+          lobby_player_list_html += "</ul>";
+          lobby_player_list.html(lobby_player_list_html);
+
+          var lobby_game_list_html = "<ul>";
+          for (var i=0; i<data.games.length; i++) {
+            lobby_game_list_html += "<li>" + data.games[i].id + " " + data.games[i].game_state + ", " + data.games[i].total_players + "</li>";
+          }
+          lobby_game_list_html += "</ul>";
+          lobby_game_list.html(lobby_game_list_html);
+        }
+      });
+
+      socket.on("client-info", function(data) {
+        user_id = data.user_id;
+        game_id = data.game_id;
+        if (game_id == null) {
+          showLobby();
+        } else {
+          showGame();
+        }
+      });
+
+      socket.on("client-data", function(data) {
+        game_viewer.setBlob(data);
+        /*
+        0 = Waiting for players to join.
+        1 = Players connected, selecting their ship's.
+        2 = Running.
+        3 = Game over.
+        */
+
+        if (data.game_state == 1) {
+          game_ready_button.show();
+        } else {
+          game_ready_button.hide();
+        }
+      });
+
+      socket.on("display-popup", function(data) {
+        if (data.action == 'show') {
+          popup_content.html(data.message);
+          popup.modal({backdrop: 'static', keyboard: false}, 'show');
+        } else if (data.action == 'update-text') {
+          popup_content.html(data.message);
+        } else if (data.action == 'hide') {
+          popup.modal('hide');
+        }
+      });
+
+      lobby_find_game_button.on('click', function(){
+        socket.emit("find-game");
+      });
+
+      game_board.on("attack", function(event, data) {
+        socket.emit("attack", data);
+      });
+
+      game_board.on("place-ship", function(event, data) {
+        socket.emit("place-ship", data);
+      });
+
+      game_board.on("ready", function(event, data) {
+        socket.emit("ready", data);
+      });
+
+    </script>
+  </body>
+</html>
