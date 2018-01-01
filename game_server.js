@@ -79,9 +79,7 @@ var GameServer = function() {
   }
 
   _self.sendClientData = function(player_slot) {
-    console.log('sendClientData', player_slot);
     if (_self.players[player_slot] !== null) {
-      console.log('player ' + player_slot + ' not null.');
       var blob = {
         game_state: _self.game_state,
         turn: _self.turn,
@@ -94,7 +92,6 @@ var GameServer = function() {
   }
 
   _self.sendAllClientData = function() {
-    console.log('sendAllClientData');
 		for (var player_slot=0; player_slot<2; player_slot++) {
 			_self.sendClientData(player_slot);
 		}
